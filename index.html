@@ -1,0 +1,250 @@
+
+
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reader</title>
+
+<style>
+:root {
+  --bg: #f4ecd8;
+  --text: #2b2b2b;
+  --max-width: 700px;
+}
+
+body {
+  margin: 0;
+  font-family: Georgia, serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* HEADER */
+header {
+  position: sticky;
+  top: 0;
+  background: white;
+  padding: 10px;
+  border-bottom: 1px solid #ddd;
+  display: flex;
+  gap: 10px;
+}
+
+input {
+  flex: 1;
+  padding: 8px;
+}
+
+button {
+  padding: 8px 12px;
+}
+
+/* CONTENUTO */
+main {
+  max-width: var(--max-width);
+  margin: auto;
+  padding: 20px;
+  line-height: 1.6;
+  font-size: 18px;
+}
+
+h1 {
+  font-size: 28px;
+}
+
+/* LINK */
+a {
+  color: #3366cc;
+  text-decoration: underline;
+}
+
+.dark a {
+  color: #8ab4f8;
+}
+
+/* LISTA */
+#savedList {
+  max-width: var(--max-width);
+  margin: auto;
+  padding: 10px;
+}
+
+.saved-item {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 5px;
+}
+
+.saved-item span {
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+/* CONTROLLI */
+.controls {
+  position: fixed;
+  bottom: 10px;
+  right: 10px;
+  display: flex;
+  gap: 5px;
+}
+
+.controls button {
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+}
+
+/* DARK MODE */
+.dark {
+  --bg: #1e1e1e;
+  --text: #eaeaea;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <button onclick="goBack()">⬅️</button>
+  <input id="url" placeholder="Inserisci URL...">
+  <button onclick="load()">Leggi</button>
+  <button onclick="save()">💾</button>
+</header>
+
+<div id="savedList"></div>
+
+<main>
+  <h1 id="title"></h1>
+  <div id="content"></div>
+</main>
+
+<div class="controls">
+  <button onclick="fontUp()">A+</button>
+  <button onclick="fontDown()">A-</button>
+  <button onclick="toggleDark()">🌙</button>
+</div>
+
+<script>
+const API = "https://server-kt7j.onrender.com/parse";
+
+let fontSize = 18;
+let historyStack = [];
+
+// ===== LOAD =====
+async function load(urlInput, fromHistory = false) {
+  const url = urlInput || document.getElementById("url").value;
+
+  if (!url) return;
+
+  if (!fromHistory && historyStack[historyStack.length - 1] !== url) {
+    historyStack.push(url);
+  }
+
+  document.getElementById("url").value = url;
+
+  document.getElementById("title").innerText = "Caricamento...";
+  document.getElementById("content").innerText = "";
+
+  try {
+    const res = await fetch(API, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({url})
+    });
+
+    const data = await res.json();
+
+    document.getElementById("title").innerText = data.title;
+    document.getElementById("content").innerHTML = data.content;
+
+    // intercetta link
+    document.querySelectorAll("#content a").forEach(link => {
+      link.addEventListener("click", function(e) {
+        e.preventDefault();
+        const url = this.href;
+        load(url);
+      });
+    });
+
+  } catch (err) {
+    document.getElementById("title").innerText = "Errore";
+  }
+}
+
+// ===== INDIETRO =====
+function goBack() {
+  if (historyStack.length > 1) {
+    historyStack.pop();
+    const previous = historyStack.pop();
+    load(previous, true);
+  }
+}
+
+// ===== SALVA =====
+function save() {
+  const url = document.getElementById("url").value;
+  if (!url) return;
+
+  let list = JSON.parse(localStorage.getItem("saved")) || [];
+
+  if (!list.includes(url)) {
+    list.push(url);
+    localStorage.setItem("saved", JSON.stringify(list));
+  }
+
+  renderList();
+}
+
+// ===== LISTA =====
+function renderList() {
+  const container = document.getElementById("savedList");
+  let list = JSON.parse(localStorage.getItem("saved")) || [];
+
+  container.innerHTML = "<h3>📚 Salvati</h3>";
+
+  list.forEach((url, index) => {
+    const div = document.createElement("div");
+    div.className = "saved-item";
+
+    div.innerHTML = `
+      <span onclick="load('${url}')">${url}</span>
+      <button onclick="removeItem(${index})">❌</button>
+    `;
+
+    container.appendChild(div);
+  });
+}
+
+// ===== ELIMINA =====
+function removeItem(index) {
+  let list = JSON.parse(localStorage.getItem("saved")) || [];
+  list.splice(index, 1);
+  localStorage.setItem("saved", JSON.stringify(list));
+  renderList();
+}
+
+// ===== FONT =====
+function fontUp() {
+  fontSize += 2;
+  document.querySelector("main").style.fontSize = fontSize + "px";
+}
+
+function fontDown() {
+  fontSize -= 2;
+  document.querySelector("main").style.fontSize = fontSize + "px";
+}
+
+// ===== DARK MODE =====
+function toggleDark() {
+  document.body.classList.toggle("dark");
+}
+
+// ===== INIT =====
+renderList();
+</script>
+
+</body>
+</html>
